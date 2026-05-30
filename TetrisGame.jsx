@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BOARD_WIDTH = 10;
@@ -29,6 +29,7 @@ export default function TetrisGame() {
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [highScores, setHighScores] = useState([]);
+  const [playerName, setPlayerName] = useState('');
 
   // Game loop
   useEffect(() => {
@@ -114,8 +115,6 @@ export default function TetrisGame() {
 
     if (!canMove(newPiece, { x: 3, y: 0 })) {
       setGameOver(true);
-      // add current score to high scores
-      addHighScore(score).catch(() => {});
     }
   };
 
@@ -157,7 +156,8 @@ export default function TetrisGame() {
 
   async function addHighScore(value) {
     try {
-      const list = [...highScores, { score: value, date: Date.now() }];
+      const entry = typeof value === 'number' ? { name: 'Anonymous', score: value, date: Date.now() } : value;
+      const list = [...highScores, entry];
       list.sort((a, b) => b.score - a.score);
       const top = list.slice(0, 10);
       setHighScores(top);
@@ -182,12 +182,12 @@ export default function TetrisGame() {
       <Text style={styles.score}>Score: {score}</Text>
       <View style={styles.leaderboard}>
         <Text style={styles.leaderTitle}>High Scores</Text>
-        <ScrollView style={{ maxHeight: 120 }}>
-          {highScores.length === 0 && <Text style={styles.leaderEmpty}>No high scores yet</Text>}
-          {highScores.map((h, i) => (
-            <Text key={i} style={styles.leaderItem}>{i + 1}. {h.score}</Text>
-          ))}
-        </ScrollView>
+          <ScrollView style={{ maxHeight: 120 }}>
+            {highScores.length === 0 && <Text style={styles.leaderEmpty}>No high scores yet</Text>}
+            {highScores.map((h, i) => (
+              <Text key={i} style={styles.leaderItem}>{i + 1}. {h.name || 'Anonymous'} — {h.score}</Text>
+            ))}
+          </ScrollView>
         <TouchableOpacity style={[styles.button, styles.clearButton]} onPress={clearHighScores}>
           <Text style={styles.buttonText}>Clear</Text>
         </TouchableOpacity>
@@ -211,9 +211,30 @@ export default function TetrisGame() {
       {gameOver && (
         <View style={styles.overlay}>
           <Text style={styles.gameOverText}>GAME OVER</Text>
-          <TouchableOpacity style={styles.button} onPress={resetGame}>
-            <Text style={styles.buttonText}>RESTART</Text>
-          </TouchableOpacity>
+          <Text style={styles.gameOverSub}>Your score: {score}</Text>
+          <TextInput
+            placeholder="Enter name"
+            value={playerName}
+            onChangeText={setPlayerName}
+            style={styles.nameInput}
+            maxLength={20}
+          />
+          <View style={{ flexDirection: 'row', marginTop: 12 }}>
+            <TouchableOpacity
+              style={[styles.button, { marginRight: 8 }]}
+              onPress={async () => {
+                const name = playerName.trim() || 'Anonymous';
+                await addHighScore({ name, score, date: Date.now() });
+                setPlayerName('');
+                resetGame();
+              }}
+            >
+              <Text style={styles.buttonText}>Save Score</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={() => { setPlayerName(''); resetGame(); }}>
+              <Text style={styles.buttonText}>Restart</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -311,5 +332,40 @@ const styles = StyleSheet.create({
   pauseButton: {
     marginTop: 20,
     backgroundColor: '#f0a000',
+  },
+  leaderboard: {
+    width: '90%',
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  leaderTitle: {
+    color: '#fff',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  leaderItem: {
+    color: '#fff',
+    fontSize: 14,
+    marginVertical: 2,
+  },
+  leaderEmpty: {
+    color: '#888',
+    fontSize: 13,
+    marginVertical: 4,
+  },
+  nameInput: {
+    width: 220,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  gameOverSub: {
+    color: '#fff',
+    marginBottom: 8,
+  },
+  clearButton: {
+    backgroundColor: '#f04444',
+    marginTop: 8,
   },
 });
