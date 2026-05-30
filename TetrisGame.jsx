@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
@@ -27,6 +28,7 @@ export default function TetrisGame() {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [highScores, setHighScores] = useState([]);
 
   // Game loop
   useEffect(() => {
@@ -112,6 +114,8 @@ export default function TetrisGame() {
 
     if (!canMove(newPiece, { x: 3, y: 0 })) {
       setGameOver(true);
+      // add current score to high scores
+      addHighScore(score).catch(() => {});
     }
   };
 
@@ -124,10 +128,70 @@ export default function TetrisGame() {
     setIsPaused(false);
   };
 
+  // High score persistence using AsyncStorage
+  const HIGH_SCORE_KEY = '@tetris_highscores_v1';
+
+  useEffect(() => {
+    loadHighScores();
+  }, []);
+
+  async function loadHighScores() {
+    try {
+      const raw = await AsyncStorage.getItem(HIGH_SCORE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setHighScores(parsed);
+      }
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  async function saveHighScores(list) {
+    try {
+      await AsyncStorage.setItem(HIGH_SCORE_KEY, JSON.stringify(list));
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  async function addHighScore(value) {
+    try {
+      const list = [...highScores, { score: value, date: Date.now() }];
+      list.sort((a, b) => b.score - a.score);
+      const top = list.slice(0, 10);
+      setHighScores(top);
+      await saveHighScores(top);
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  async function clearHighScores() {
+    try {
+      await AsyncStorage.removeItem(HIGH_SCORE_KEY);
+      setHighScores([]);
+    } catch (err) {
+      // ignore
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>TETRIS</Text>
       <Text style={styles.score}>Score: {score}</Text>
+      <View style={styles.leaderboard}>
+        <Text style={styles.leaderTitle}>High Scores</Text>
+        <ScrollView style={{ maxHeight: 120 }}>
+          {highScores.length === 0 && <Text style={styles.leaderEmpty}>No high scores yet</Text>}
+          {highScores.map((h, i) => (
+            <Text key={i} style={styles.leaderItem}>{i + 1}. {h.score}</Text>
+          ))}
+        </ScrollView>
+        <TouchableOpacity style={[styles.button, styles.clearButton]} onPress={clearHighScores}>
+          <Text style={styles.buttonText}>Clear</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.boardContainer}>
         {board.map((row, y) => (
