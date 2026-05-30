@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView, TextInput } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
@@ -30,6 +31,9 @@ export default function TetrisGame() {
   const [isPaused, setIsPaused] = useState(false);
   const [highScores, setHighScores] = useState([]);
   const [playerName, setPlayerName] = useState('');
+  const rotateSound = useRef(null);
+  const lineClearSound = useRef(null);
+  const gameOverSound = useRef(null);
 
   // Game loop
   useEffect(() => {
@@ -70,6 +74,7 @@ export default function TetrisGame() {
     };
     if (canMove(rotated, position)) {
       setCurrentPiece(rotated);
+      (async () => { try { if (rotateSound.current) await rotateSound.current.replayAsync(); } catch (e) {} })();
     }
   };
 
@@ -106,6 +111,7 @@ export default function TetrisGame() {
         clearedBoard.unshift(Array(BOARD_WIDTH).fill(null));
       }
       setScore(score + linesCleared * 100);
+      (async () => { try { if (lineClearSound.current) await lineClearSound.current.replayAsync(); } catch (e) {} })();
     }
 
     setBoard(clearedBoard);
@@ -115,6 +121,7 @@ export default function TetrisGame() {
 
     if (!canMove(newPiece, { x: 3, y: 0 })) {
       setGameOver(true);
+      (async () => { try { if (gameOverSound.current) await gameOverSound.current.replayAsync(); } catch (e) {} })();
     }
   };
 
@@ -132,6 +139,38 @@ export default function TetrisGame() {
 
   useEffect(() => {
     loadHighScores();
+
+    // load sound effects (remote fallback URLs)
+    (async () => {
+      try {
+        const rotateUrl = require('./assets/sounds/rotate.ogg');
+        const clearUrl = require('./assets/sounds/clear.ogg');
+        const overUrl = require('./assets/sounds/gameover.ogg');
+
+        rotateSound.current = new Audio.Sound();
+        await rotateSound.current.loadAsync(rotateUrl);
+
+        lineClearSound.current = new Audio.Sound();
+        await lineClearSound.current.loadAsync(clearUrl);
+
+        gameOverSound.current = new Audio.Sound();
+        await gameOverSound.current.loadAsync(overUrl);
+      } catch (e) {
+        // ignore sound load errors
+      }
+    })();
+
+    return () => {
+      (async () => {
+        try {
+          if (rotateSound.current) await rotateSound.current.unloadAsync();
+          if (lineClearSound.current) await lineClearSound.current.unloadAsync();
+          if (gameOverSound.current) await gameOverSound.current.unloadAsync();
+        } catch (e) {
+          // ignore
+        }
+      })();
+    };
   }, []);
 
   async function loadHighScores() {
